@@ -17,3 +17,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Hand-made archives. Upload extension/dist/rosint-*.zip instead.
+*.zip
+*.xpi
