@@ -92,13 +92,21 @@ test('without retryWhen a 422 still fails fast', async () => {
 });
 
 test('a hung attempt times out and is retried', async () => {
-    let n = 0;
-    const res = await fetchWithBackoff(url, {
-        timeoutMs: 50, wait: async () => {}, random: () => 0,
-        fetcher: (_, init) => (n++ === 0
-            ? new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))))
-            : Promise.resolve(new Response('{}', { status: 200 }))),
-    });
-    assert.equal(res.status, 200);
-    assert.equal(n, 2);
+    // Node's AbortSignal.timeout() timer is unref'd: with nothing else
+    // pending, some Node versions end the test before it fires. Browsers
+    // (where this code runs) have no such behaviour.
+    const keepAlive = setInterval(() => {}, 1000);
+    try {
+        let n = 0;
+        const res = await fetchWithBackoff(url, {
+            timeoutMs: 50, wait: async () => {}, random: () => 0,
+            fetcher: (_, init) => (n++ === 0
+                ? new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))))
+                : Promise.resolve(new Response('{}', { status: 200 }))),
+        });
+        assert.equal(res.status, 200);
+        assert.equal(n, 2);
+    } finally {
+        clearInterval(keepAlive);
+    }
 });
