@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark">
+  <title>Rosint Hidden History</title>
+  <style>
+    @font-face { font-family: Sora; src: url("assets/fonts/sora.woff2") format("woff2"); font-weight: 100 800; font-display: block; }
+    :root {
+      --bg: #000;
+      --raise: #0d0d0f;
+      --raise-2: #161618;
+      --line: rgba(255, 255, 255, .08);
+      --line-2: rgba(255, 255, 255, .14);
+      --text: #f5f5f7;
+      --muted: rgba(235, 235, 245, .64);
+      --faint: rgba(235, 235, 245, .42);
+      --accent: #fe5301;
+      --accent-hi: #ff6a24;
+      --ok: #30d158;
+      --warn: #ffd60a;
+      --bad: #ff453a;
+      --idle: rgba(235, 235, 245, .3);
+      --ease: cubic-bezier(.23, 1, .32, 1);
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      width: 360px; margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+      font: 400 13px/1.45 Sora, ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased; font-feature-settings: "ss01";
+      overflow-x: hidden;
+    }
+    ::selection { background: rgba(254, 83, 1, .4); color: #fff; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    [hidden] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; padding: 0; }
+
+    .top { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; }
+    .orb {
+      position: relative; width: 18px; height: 18px; border-radius: 50%; flex: none;
+      background: linear-gradient(180deg, #ff7a45, #fd4602);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, .3), inset 0 -2px 3px rgba(140, 30, 0, .35);
+    }
+    .orb::after { content: ""; position: absolute; inset: 2px 4px 9px 4px; border-radius: 50%; background: linear-gradient(rgba(255,255,255,.4), rgba(255,255,255,0)); }
+    .busy .orb { animation: breathe 1.5s cubic-bezier(.45, 0, .55, 1) infinite; }
+    @keyframes breathe { 50% { transform: scale(.88); opacity: .85; } }
+    .brand { font-weight: 600; font-size: 14px; letter-spacing: -.01em; }
+    .product { color: var(--faint); font-size: 12px; }
+    .version { margin-left: auto; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+    .hero { position: relative; padding: 22px 20px 20px; }
+    .who { font-size: 12px; color: var(--muted); margin: 0 0 6px; min-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 600; letter-spacing: -.025em; text-wrap: balance; }
+    .lede { margin: 8px 0 0; color: var(--muted); text-wrap: pretty; }
+    .progress { position: relative; height: 2px; margin: 18px 0 0; border-radius: 2px; background: var(--line); overflow: hidden; }
+    .progress::before { content: ""; position: absolute; top: 0; bottom: 0; width: 38%; left: -38%; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: sweep 1.2s cubic-bezier(.65, 0, .35, 1) infinite; }
+    @keyframes sweep { to { left: 100%; } }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 20px 0 0; padding: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .stats div { display: flex; flex-direction: column-reverse; padding: 12px 0 12px 14px; border-left: 1px solid var(--line); min-width: 0; }
+    .stats div:first-child { border-left: 0; padding-left: 0; }
+    .stats dd { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats dt { margin-top: 3px; font-size: 11px; color: var(--faint); }
+    .stats dd.small { font-size: 15px; line-height: 23px; }
+
+    .actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; margin-top: 20px; }
+    .actions:empty { display: none; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 40px; padding: 0 16px; border-radius: 12px; font-weight: 600; font-size: 13px; letter-spacing: -.005em;
+      background: var(--raise-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line);
+      transition: transform .16s var(--ease), background-color .15s ease, box-shadow .15s ease;
+    }
+    .btn:hover { background: #1f1f22; }
+    .btn:active { transform: scale(.97); }
+    .btn.primary { background: var(--accent); color: #000; box-shadow: none; }
+    .btn.primary:hover { background: var(--accent-hi); }
+    .btn[disabled] { opacity: .5; pointer-events: none; }
+    .btn svg { width: 15px; height: 15px; flex: none; }
+    .btn svg:first-child { margin-left: -2px; }
+    .btn svg:last-child:not(:first-child) { margin-right: -2px; opacity: .7; }
+    .btn.primary svg { stroke-width: 2; }
+
+    .section { padding: 16px 20px; border-top: 1px solid var(--line); }
+    .section h2 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--faint); letter-spacing: 0; }
+    .services { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+    .services li { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 10px; height: 28px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(48, 209, 88, .14); }
+    .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px rgba(255, 214, 10, .14); }
+    .dot.bad { background: var(--bad); box-shadow: 0 0 0 3px rgba(255, 69, 58, .16); }
+    .svc-name { font-size: 13px; }
+    .svc-state { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+    .saved { display: flex; align-items: baseline; gap: 12px; margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: var(--faint); }
+    .saved .link { flex: none; font-size: 11px; font-weight: 600; color: var(--muted); border-radius: 6px; padding: 2px 6px; margin: -2px -6px; transition: color .15s ease, background-color .15s ease; }
+    .saved .link:hover { color: var(--text); background: var(--raise-2); }
+
+    .field { display: flex; align-items: center; height: 40px; border-radius: 12px; background: var(--raise); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .15s ease; }
+    .field:focus-within { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(254, 83, 1, .18); }
+    .prefix { padding: 0 2px 0 14px; color: var(--faint); font-weight: 500; }
+    .field input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; padding: 0 8px 0 0; font-size: 13px; caret-color: var(--accent); }
+    .field input::placeholder { color: var(--faint); }
+    .go { width: 32px; height: 32px; margin-right: 4px; border-radius: 9px; display: grid; place-items: center; color: var(--muted); transition: background-color .15s ease, color .15s ease, transform .16s var(--ease); }
+    .go:hover { background: var(--raise-2); color: var(--text); }
+    .go:active { transform: scale(.94); }
+    .go svg { width: 16px; height: 16px; }
+    .hint { margin: 6px 2px 0; font-size: 11px; color: var(--bad); min-height: 0; }
+
+    footer { display: flex; align-items: center; gap: 16px; padding: 14px 20px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); }
+    footer a { transition: color .15s ease; border-radius: 4px; }
+    footer a:hover { color: var(--text); }
+    footer .spacer { flex: 1; }
+
+    /* Firefox for Android opens the popup as a full-width sheet. */
+    body.sheet { width: auto; max-width: 560px; margin: 0 auto; }
+    body.sheet .btn, body.sheet .field { height: 48px; }
+    body.sheet .go { width: 40px; height: 40px; }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main id="app" class="busy">
+    <header class="top">
+      <span class="orb" aria-hidden="true"></span>
+      <span class="brand">Rosint</span>
+      <span class="product">Hidden History</span>
+      <span class="version" id="version"></span>
+    </header>
+
+    <section class="hero" id="hero">
+      <p class="who" id="who"></p>
+      <h1 id="title">Checking this tab…</h1>
+      <p class="lede" id="lede"></p>
+      <p class="sr-only" id="announce" role="status" aria-live="polite"></p>
+      <dl class="stats" id="stats" hidden>
+        <div><dt>Posts</dt><dd id="stat-posts">0</dd></div>
+        <div><dt>Comments</dt><dd id="stat-comments">0</dd></div>
+        <div><dt>Earliest saved</dt><dd id="stat-since" class="small">–</dd></div>
+      </dl>
+      <div class="progress" id="progress" hidden></div>
+      <div class="actions" id="actions"></div>
+    </section>
+
+    <section class="section" aria-labelledby="services-title">
+      <h2 id="services-title">Services</h2>
+      <ul class="services">
+        <li data-service="removal"><span class="dot"></span><span class="svc-name">Removal check</span><span class="svc-state">Checking…</span></li>
+        <li data-service="arctic"><span class="dot"></span><span class="svc-name">Arctic Shift</span><span class="svc-state">Not used yet</span></li>
+        <li data-service="pullpush"><span class="dot"></span><span class="svc-name">PullPush</span><span class="svc-state">Not used yet</span></li>
+      </ul>
+      <p class="saved" id="saved" hidden>
+        <span>Your browser keeps <span id="saved-count"></span> so profiles open instantly and stay readable when the archives are down.</span>
+        <button class="link" id="forget" type="button">Forget</button>
+      </p>
+    </section>
+
+    <form class="section" id="lookup" autocomplete="off" novalidate>
+      <h2><label for="username">Open a profile</label></h2>
+      <div class="field">
+        <span class="prefix" aria-hidden="true">u/</span>
+        <input id="username" name="username" type="text" inputmode="text" spellcheck="false" autocapitalize="off" placeholder="username" maxlength="80" aria-describedby="lookup-hint">
+        <button class="go" type="submit" aria-label="Open profile on Reddit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+      <p class="hint" id="lookup-hint" hidden></p>
+    </form>
+
+    <footer>
+      <a href="https://rosint.dev/" target="_blank" rel="noopener">rosint.dev</a>
+      <a href="https://removal.rosint.dev/" target="_blank" rel="noopener">Request removal</a>
+      <span class="spacer"></span>
+      <a id="source" href="https://github.com/yoshik08/ROSINT-Extension" target="_blank" rel="noopener">Source</a>
+    </footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

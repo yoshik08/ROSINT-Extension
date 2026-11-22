@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Request removal of your history
+    url: https://removal.rosint.dev/
+    about: Removal requests go through the removal service, not GitHub issues.
+  - name: Report a security issue
+    url: https://github.com/yoshik08/ROSINT-Extension/security/advisories/new
+    about: Please report vulnerabilities privately.

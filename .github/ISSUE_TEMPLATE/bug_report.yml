@@ -1,0 +1,33 @@
+name: Bug report
+description: Something on a Reddit profile or in the popup isn't working
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      description: Shown at the top right of the popup.
+      placeholder: v1.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options: [Chrome, Edge, Brave, Other Chromium, Firefox desktop, Firefox Android]
+    validations:
+      required: true
+  - type: dropdown
+    id: session
+    attributes:
+      label: Signed in to Reddit?
+      options: ["Yes", "No"]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the popup's message and the header text above the restored rows if there is one. Please don't post usernames of private individuals; describe the profile instead.
+    validations:
+      required: true

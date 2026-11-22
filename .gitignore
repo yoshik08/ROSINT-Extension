@@ -1,0 +1,19 @@
+node_modules/
+.vite/
+
+# Build output. Only manifest.json is tracked in the browser folders.
+extension/dist/
+extension/chrome/*
+extension/firefox/*
+!extension/chrome/manifest.json
+!extension/firefox/manifest.json
+
+# Local tooling
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+.vscode/
+.idea/
+.claude/
