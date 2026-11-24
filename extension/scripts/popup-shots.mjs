@@ -1,12 +1,13 @@
 // Renders the built popup in each state with a stubbed extension API, for
 // visual review without a browser profile. Output: extension/dist/popup/*.png
 //   node extension/scripts/popup-shots.mjs
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 const out = resolve('extension/dist/popup');
+const { version } = JSON.parse(readFileSync(resolve('extension/chrome/manifest.json'), 'utf8'));
 mkdirSync(out, { recursive: true });
 const now = Date.now();
 const health = { arctic: { ok: true, at: now - 40000 }, pullpush: { ok: false, at: now - 40000 } };
@@ -19,19 +20,20 @@ const states = {
     error: { url: profileUrl, conn: { ok: true, missing: [], health: { arctic: { ok: false, at: now - 5000 }, pullpush: { ok: false, at: now - 5000 } } }, state: { phase: 'error', failure: 'error', count: 0 } },
     access: { url: profileUrl, conn: { ok: false, error: 'host-permission-required', missing: ['https://api.pullpush.io/*'] }, state: null },
     idle: { url: 'https://github.com/', conn: { ok: true, missing: [], health }, state: null },
+    archive: { url: 'https://www.reddit.com/r/example/', conn: { ok: true, missing: [], health }, state: null, archive: { scope: 'community', subreddit: 'example', counts: { posts: 24, comments: 0 }, oldest: 1795400000, loading: false, restricted: false, failure: null } },
 };
 const browser = await chromium.launch({ headless: true });
 for (const [name, fixture] of Object.entries(states)) {
     const page = await browser.newPage({ viewport: { width: 360, height: 600 }, deviceScaleFactor: 2 });
     await page.addInitScript((f) => {
         const stub = {
-            runtime: { getManifest: () => ({ version: '1.3.0' }), sendMessage: async () => f.conn, id: 'x', getURL: (p) => p },
-            tabs: { query: async () => [{ id: 1, url: f.url }], sendMessage: async () => ({ ok: true, state: f.state }), reload: async () => {}, update: async () => {}, create: async () => {} },
+            runtime: { getManifest: () => ({ version: f.version }), sendMessage: async () => f.conn, id: 'x', getURL: (p) => p },
+            tabs: { query: async () => [{ id: 1, url: f.url }], sendMessage: async () => ({ ok: true, state: f.state, archive: f.archive ?? null }), reload: async () => {}, update: async () => {}, create: async () => {} },
             permissions: { request: async () => true },
             action: { setBadgeText: async () => {} },
         };
         globalThis.chrome = stub;
-    }, fixture);
+    }, { ...fixture, version });
     await page.goto(pathToFileURL(resolve('extension/chrome/popup.html')).href);
     await page.waitForTimeout(700);
     const height = await page.evaluate(() => document.body.scrollHeight);

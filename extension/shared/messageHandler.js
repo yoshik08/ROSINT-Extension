@@ -5,14 +5,19 @@ import { ARCTIC } from '../../src/archive.js';
 import { createPostLookup } from '../../src/postLookup.js';
 import { createArchiveService } from './archiveService.js';
 import { createArchiveCache } from './cache.js';
+import { createCommunityArchive } from './communityArchive.js';
 import { MESSAGE } from './config.js';
+import { createRestrictionGate } from './restrictions.js';
 
 const REDDIT_SENDER = /^https:\/\/(www\.)?reddit\.com\//;
 const POST_ID = /^[a-z0-9]+$/i;
 
 const defaultLookup = createPostLookup({ base: ARCTIC });
 const defaultCache = createArchiveCache();
-export const defaultArchive = createArchiveService({ cache: defaultCache });
+// One removal check (and one cached removal list) for every kind of request.
+const defaultGate = createRestrictionGate();
+export const defaultArchive = createArchiveService({ cache: defaultCache, gate: defaultGate });
+const defaultCommunity = createCommunityArchive({ gate: defaultGate });
 
 function isRedditSender(sender) {
     const url = sender?.url || sender?.tab?.url || '';
@@ -42,13 +47,15 @@ export async function postInfo(ids, lookup = defaultLookup, cache = null) {
     };
 }
 
-export function createMessageHandler({ archive = defaultArchive, lookup = defaultLookup, cache = defaultCache } = {}) {
+export function createMessageHandler({ archive = defaultArchive, lookup = defaultLookup, cache = defaultCache, community = defaultCommunity } = {}) {
     return async function handle(message, sender) {
         if (!isRedditSender(sender) || !message || typeof message !== 'object') {
             return { ok: false, items: [] };
         }
         if (message.type === MESSAGE.archivePage) return archive.page(message);
         if (message.type === MESSAGE.postInfo) return postInfo(message.ids, lookup, cache);
+        if (message.type === MESSAGE.communityPage) return community.community(message);
+        if (message.type === MESSAGE.threadPage) return community.thread(message);
         return { ok: false, items: [] };
     };
 }

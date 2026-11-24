@@ -21,8 +21,16 @@ describe.each([['chrome', chrome], ['firefox', firefox]])('%s manifest', (target
         expect(manifest.optional_permissions).toBeUndefined();
     });
 
-    test('runs the content script on reddit.com only', () => {
-        expect(manifest.content_scripts.map((script) => script.matches)).toEqual([['*://www.reddit.com/*']]);
+    test('runs its content scripts on reddit.com only', () => {
+        expect(manifest.content_scripts.map((script) => script.matches)).toEqual([['*://www.reddit.com/*'], ['*://www.reddit.com/*']]);
+    });
+
+    test('quiets Reddit before its markup arrives, then restores history once the page is idle', () => {
+        expect(manifest.content_scripts.map((script) => [script.js, script.run_at])).toEqual([
+            [['quiet.js'], 'document_start'],
+            [['content.js'], 'document_idle'],
+        ]);
+        expect(manifest.content_scripts.some((script) => script.all_frames)).toBe(false);
     });
 
     test('fits store limits', () => {
@@ -57,7 +65,7 @@ test('Firefox declares what leaves the browser', () => {
 });
 
 test('shared sources contain no HTML sinks or dynamic code', () => {
-    const files = ['content.js', 'injector.js', 'feedView.js', 'visibleCard.js', 'markdown.js', 'nativeFeed.js', 'popup.js', 'background.js'];
+    const files = ['content.js', 'injector.js', 'feedView.js', 'visibleCard.js', 'markdown.js', 'nativeFeed.js', 'popup.js', 'background.js', 'quiet.js', 'quietScript.js', 'fallback.js', 'communityArchive.js', 'settings.js'];
     for (const file of files) {
         const source = readFileSync(resolve(root, 'shared', file), 'utf8');
         expect(source, file).not.toMatch(/\.innerHTML\s*=|outerHTML\s*=|insertAdjacentHTML|document\.write|\beval\(|new Function\(/);

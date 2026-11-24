@@ -23,7 +23,12 @@ export const MESSAGE = {
     postInfo: 'rosint/post-info',
     clearSaved: 'rosint/clear-saved',
     health: 'rosint/health',
+    communityPage: 'rosint/community-page',
+    threadPage: 'rosint/thread-page',
 };
+
+// Messages that read the archives, so they need the archive host grants.
+export const ARCHIVE_MESSAGES = new Set([MESSAGE.archivePage, MESSAGE.communityPage, MESSAGE.threadPage]);
 
 // Feed tabs Reddit exposes on a profile. Overview interleaves both kinds.
 export const TAB_KINDS = {

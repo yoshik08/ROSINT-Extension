@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Rosint Hidden History",
   "short_name": "Rosint",
-  "version": "1.3.0",
-  "description": "See the posts and comments of Reddit profiles that hide their history, restored from public archives right on the profile.",
+  "version": "1.4.0",
+  "description": "See what Reddit hides: hidden profile histories from public archives, and no sign-in nags or NSFW gates while signed out.",
   "homepage_url": "https://github.com/yoshik08/ROSINT-Extension",
   "icons": {
     "16": "assets/icons/icon-16.png",
@@ -49,6 +49,15 @@
     ]
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://www.reddit.com/*"
+      ],
+      "js": [
+        "quiet.js"
+      ],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "*://www.reddit.com/*"

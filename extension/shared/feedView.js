@@ -98,6 +98,29 @@ function viewSkeleton(doc, kind) {
     return row;
 }
 
+// Header copy for the signed-out fallback, where the rows are Arctic Shift's
+// copy of a community or a post that Reddit will not show without an account.
+function archiveCopy(scope, name) {
+    if (scope === 'thread') {
+        return {
+            loading: ['Loading this post from the archive', 'Reddit shows this post only to signed-in accounts. Rosint is reading the copy Arctic Shift saved.'],
+            found: ({ posts, comments }) => (posts ? `Post and ${plural(comments, 'comment')} from the archive` : `${plural(comments, 'comment')} from the archive`),
+            end: 'That’s every comment the archive has for this post',
+            empty: ['This post isn’t in the archive yet', 'Arctic Shift usually saves new posts within an hour or two. Try again later.'],
+            removed: ['This post was removed', 'Reddit or the community’s moderators removed it, and nobody has commented, so there is nothing to show.'],
+            restricted: ['This post can’t be shown right now', 'Rosint couldn’t confirm its removal list, so nothing is shown. Try again in a minute.'],
+        };
+    }
+    return {
+        loading: [`Loading r/${name} from the archive`, 'Reddit shows this community only to signed-in accounts. Rosint is reading the copy Arctic Shift saved.'],
+        found: ({ posts }) => `${plural(posts, 'post')} from r/${name}`,
+        end: `That’s everything the archive has for r/${name}`,
+        empty: [`Nothing archived for r/${name}`, 'Arctic Shift has no posts saved for this community.'],
+        removed: [`Nothing to show from r/${name}`, 'Every recent post the archive has here was removed by Reddit or the moderators.'],
+        restricted: [`r/${name} can’t be shown right now`, 'Rosint couldn’t confirm its removal list, so nothing is shown. Try again in a minute.'],
+    };
+}
+
 function viewSummary({ posts, comments }, tab) {
     if (tab === 'posts') return plural(posts, 'post');
     if (tab === 'comments') return plural(comments, 'comment');
@@ -108,7 +131,10 @@ function viewSummary({ posts, comments }, tab) {
 
 // The view is a single host with three light-DOM regions: the header (in the
 // host's shadow root), the list of rows, and the footer/sentinel area.
-export function createFeedView({ doc, username, tab, onRetry }) {
+// `scope` is 'profile' (a hidden profile, the default), 'community' or
+// 'thread' (the signed-out fallback); `name` is the community for 'community'.
+export function createFeedView({ doc, username, tab, onRetry, scope = 'profile', name = username }) {
+    const archive = scope === 'profile' ? null : archiveCopy(scope, name);
     const root = doc.createElement('div');
     root.setAttribute('data-rosint-feed', '');
     root.style.cssText = 'display:block!important;width:100%;box-sizing:border-box;text-align:left;margin:0;padding:0;min-height:0;';
@@ -124,8 +150,9 @@ export function createFeedView({ doc, username, tab, onRetry }) {
     const orb = viewEl(doc, 'span', 'orb');
     orb.setAttribute('aria-hidden', 'true');
     const text = viewEl(doc, 'div', 'text');
-    const title = viewEl(doc, 'span', 'title', `Searching public archives for u/${username}`);
-    const detail = viewEl(doc, 'span', 'detail', 'Reddit hides this history. Rosint is checking Arctic Shift and PullPush.');
+    const loadingCopy = archive ? archive.loading : [`Searching public archives for u/${username}`, 'Reddit hides this history. Rosint is checking Arctic Shift and PullPush.'];
+    const title = viewEl(doc, 'span', 'title', loadingCopy[0]);
+    const detail = viewEl(doc, 'span', 'detail', loadingCopy[1]);
     text.append(title, detail);
     const actions = viewEl(doc, 'div', 'actions');
     const open = viewEl(doc, 'a', 'btn');
@@ -141,7 +168,9 @@ export function createFeedView({ doc, username, tab, onRetry }) {
         event.preventDefault();
         onRetry?.();
     });
-    actions.append(retry, open);
+    actions.append(retry);
+    // Rosint's search is per account, so only profiles link to it.
+    if (!archive) actions.append(open);
     const progress = viewEl(doc, 'span', 'progress');
     banner.append(orb, text, actions, progress);
     const topSkeletons = viewEl(doc, 'div', 'skeletons');
@@ -185,7 +214,7 @@ export function createFeedView({ doc, username, tab, onRetry }) {
         header,
         // First page in flight: header plus skeleton rows.
         loading() {
-            setHeader(`Searching public archives for u/${username}`, 'Reddit hides this history. Rosint is checking Arctic Shift and PullPush.', { busy: true });
+            setHeader(loadingCopy[0], loadingCopy[1], { busy: true });
             topSkeletons.hidden = false;
             bottomSkeletons.hidden = true;
             end.hidden = true;
@@ -198,9 +227,13 @@ export function createFeedView({ doc, username, tab, onRetry }) {
         ready({ counts, archived, done, oldest, savedAt = null, refreshing = false, offlineAt = null }) {
             topSkeletons.hidden = true;
             const total = counts.posts + counts.comments;
-            const found = viewSummary(counts, tab);
+            const found = archive ? archive.found(counts) : viewSummary(counts, tab);
             let note;
-            if (offlineAt) {
+            if (archive) {
+                note = refreshing
+                    ? 'From the Arctic Shift archive. Loading more…'
+                    : 'Archived copies from Arctic Shift. Scores and text are as they were saved and may have changed since.';
+            } else if (offlineAt) {
                 note = `The archives aren’t answering, so this is what your browser saved ${relativeTime(offlineAt / 1000)}.`;
             } else if (refreshing) {
                 note = savedAt
@@ -211,13 +244,14 @@ export function createFeedView({ doc, username, tab, onRetry }) {
                     ? 'From public archives. Scores and text are as they were saved and may have changed since.'
                     : 'From public archives, checked against Reddit just now. Deleted and removed items are left out.';
             }
-            setHeader(total ? `${found} restored` : 'Nothing to show in this tab', note, { busy: refreshing, canRetry: Boolean(offlineAt) });
+            const heading = archive ? found : `${found} restored`;
+            setHeader(total ? heading : 'Nothing to show in this tab', note, { busy: refreshing, canRetry: Boolean(offlineAt) });
             end.replaceChildren();
             end.hidden = !done;
             if (done) {
                 const mark = viewEl(doc, 'span', 'orb');
                 mark.setAttribute('aria-hidden', 'true');
-                end.append(mark, viewEl(doc, 'span', 'title', `That’s everything the archives have for u/${username}`));
+                end.append(mark, viewEl(doc, 'span', 'title', archive ? archive.end : `That’s everything the archives have for u/${username}`));
                 if (oldest) end.append(viewEl(doc, 'span', 'detail', `Earliest saved item: ${shortDate(oldest)}`));
             }
         },
@@ -236,6 +270,13 @@ export function createFeedView({ doc, username, tab, onRetry }) {
                 error: ['The archives aren’t answering', 'Arctic Shift and PullPush are overloaded or rate limiting, and this browser has no saved copy of this profile yet. Try again in a minute.'],
                 retrying: [`Searching public archives for u/${username}`, 'Arctic Shift is busy. Trying again in a moment…'],
                 permission: ['Rosint needs site access', 'Click the Rosint icon in your toolbar, then “Allow access”. Rosint only asks for Reddit, the two archives and its removal check.'],
+                ...(archive ? {
+                    empty: archive.empty,
+                    removed: archive.removed,
+                    restricted: archive.restricted,
+                    error: ['The archive isn’t answering', 'Arctic Shift is overloaded or rate limiting. Try again in a minute.'],
+                    retrying: [archive.loading[0], 'Arctic Shift is busy. Trying again in a moment…'],
+                } : {}),
             }[kind] || ['Something went wrong', 'Try again in a moment.'];
             setHeader(copy[0], copy[1], { canRetry: kind === 'error' || kind === 'permission', busy: kind === 'retrying' });
         },

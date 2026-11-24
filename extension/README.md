@@ -8,7 +8,7 @@ what the extension does and how to install it.
 
 ```
 extension/
-  shared/          all extension source (content script, worker, popup, renderer)
+  shared/          all extension source (content scripts, worker, popup, renderer)
     assets/        Sora font (OFL) and icons, copied into each browser folder
   chrome/          manifest.json (Chrome MV3 service worker); build output lands here
   firefox/         manifest.json (Firefox MV3 event page); build output lands here
@@ -29,11 +29,14 @@ node extension/scripts/build.mjs     # or: npm run ext:build
 
 The build has no dependencies beyond Node 20+. It:
 
-1. bundles `shared/popup.js`, `shared/content.js` and `shared/background.js`
-   into classic scripts for each browser. Content scripts and Firefox's event
-   page have no ES module support, so the build walks the import graph
-   (including `../src`) and concatenates it. Top-level names must therefore be
-   unique across all bundled modules; the build fails on a duplicate;
+1. bundles `shared/popup.js`, `shared/quietScript.js` (as `quiet.js`),
+   `shared/content.js` and `shared/background.js` into classic scripts for
+   each browser. Content scripts and Firefox's event page have no ES module
+   support, so the build walks the import graph (including `../src`) and
+   concatenates it inside one function scope per bundle (both content scripts
+   share the page's isolated world, so bare top-level declarations would
+   collide). Top-level names must be unique across the modules of a bundle;
+   the build fails on a duplicate;
 2. copies `popup.html` and `assets/` into `chrome/` and `firefox/`;
 3. checks that both manifests have the same version and that every file a
    manifest references exists;
@@ -97,6 +100,26 @@ public archives, and Mozilla counts that as transmitting browsing activity.
    posts and comments tabs render one kind each. Infinite scroll fetches the
    next archive page, and the New/Hot/Top dropdown re-orders injected rows.
 
+5. **Quiet Reddit** (`quietScript.js`, `quiet.js`) runs at `document_start` on
+   every Reddit page. Its stylesheet applies at once; the rest waits for the
+   saved setting (`settings.js`, on by default). A page counts as signed out
+   only when Reddit drew something it shows signed-out viewers alone (the
+   header's Log In button, Google One Tap, the sign-up rail, the NSFW gate).
+   Then it removes the `configured-xpromo` dialogs (NSFW gate, app sheets),
+   unblurs `shreddit-blurred-container[reason="nsfw"]`, clicks the over-18
+   guard and sets `over18=true`, and closes `auth-flow-manager` modals (with
+   Escape) and the Android sign-up sheet (by dropping `open`) unless a Log In
+   or Sign Up click opened them. It records the result as attributes on
+   `<html>` (`data-rosint-quiet`, `data-rosint-signed-out`,
+   `data-rosint-nsfw-gate`) for the main content script.
+6. **Archive fallback** (`fallback.js`, worker side `communityArchive.js`):
+   signed out with Quiet Reddit on, a community or post page that Reddit
+   answered with "not found" behind its NSFW gate gets Arctic Shift's copy:
+   `/api/posts/search?subreddit=` newest first, or `/api/posts/ids` plus
+   `/api/comments/search?link_id=`. Every author is checked against the
+   removal list in the worker (fail closed), and removed or deleted rows are
+   dropped in the page as they would be on Reddit.
+
 Rendering details are in [RENDERING.md](./RENDERING.md).
 
 ## Shared modules
@@ -129,7 +152,7 @@ imports the same modules rosint.dev uses:
 
 ## Permissions and privacy
 
-* `host_permissions`: `www.reddit.com` (content script and same-origin reads),
+* `host_permissions`: `www.reddit.com` (content scripts and same-origin reads),
   `arctic-shift.photon-reddit.com`, `api.pullpush.io`, `removal.rosint.dev`.
 * `storage`: rows already restored are kept in `storage.local` (up to 80
   username/tab lists of 1,000 rows, plus parent post titles). They never sync
@@ -137,8 +160,10 @@ imports the same modules rosint.dev uses:
   popup clears them.
 * No analytics and no remote code. Off Reddit profile pages the extension
   makes no requests, and on profiles it talks only to Reddit until one that
-  hides its history is found. Opening the popup downloads the removal list to
-  show service status.
+  hides its history is found. Quiet Reddit makes no requests at all; only
+  its archive fallback, on a community or post Reddit refused, asks Arctic
+  Shift. Opening the popup downloads the removal list to show service status.
+* `storage` also holds the Quiet Reddit switch (`rosint:quiet`).
 
 See [PRIVACY.md](../PRIVACY.md).
 
@@ -179,3 +204,12 @@ removal service and archives. Firefox runs on the real reddit.com.
 
 Please don't loop the live scripts: PullPush asks automated clients to back
 off.
+
+Quiet Reddit was verified by hand against real reddit.com, signed out, in
+headless Firefox with the packaged add-on (Nov 2026): r/AskReddit (no One Tap,
+no sign-up rail, a vote opens nothing, Log In still opens), an NSFW text
+community (no gate, posts unblurred), an over-18-guarded community (opens
+directly, media visible), an adult community and post Reddit refuses (filled
+from Arctic Shift), and the Firefox for Android layout (One Tap, Open App and
+the sign-up sheet gone). Reddit sometimes answers a fresh automated session
+with "Prove your humanity"; load an ordinary page first.

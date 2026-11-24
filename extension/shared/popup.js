@@ -4,6 +4,7 @@
 import { MESSAGE } from './config.js';
 import { REQUIRED_ORIGINS } from './connection.js';
 import { plural, relativeTime } from './format.js';
+import { readQuiet, writeQuiet } from './settings.js';
 
 const api = globalThis.browser ?? globalThis.chrome;
 const $ = (id) => document.getElementById(id);
@@ -227,6 +228,35 @@ function schedule(ms) {
     pollTimer = setTimeout(refresh, ms);
 }
 
+// The signed-out NSFW fallback: a community or post shown from the archive.
+function describeArchive(archive) {
+    const community = archive.scope === 'community';
+    const who = community ? `r/${archive.subreddit}` : `r/${archive.subreddit} · post`;
+    const counts = archive.counts || { posts: 0, comments: 0 };
+    const total = counts.posts + counts.comments;
+    const reload = button('Reload', { iconName: 'retry', onClick: retryProfile });
+    if (archive.restricted && !total) {
+        return { key: 'archive-restricted', who, title: 'Can’t be shown right now', lede: 'Rosint couldn’t confirm its removal list, so nothing from the archive is shown.', actions: [reload] };
+    }
+    if (archive.failure && !total) {
+        return { key: 'archive-error', who, title: 'The archive didn’t answer', lede: 'Arctic Shift may be busy or rate limiting. Give it a moment.', actions: [button('Try again', { primary: true, iconName: 'retry', onClick: retryProfile })] };
+    }
+    if (!total) {
+        return archive.loading
+            ? { key: 'archive-loading', who, title: 'Loading from the archive…', lede: `Reddit shows this ${community ? 'community' : 'post'} only to signed-in accounts, so Rosint is reading Arctic Shift’s copy.`, busy: true }
+            : { key: 'archive-empty', who, title: 'Nothing archived yet', lede: 'Arctic Shift has nothing saved here yet.', actions: [reload] };
+    }
+    return {
+        key: 'archive-ready',
+        who,
+        title: 'Showing the archived copy',
+        lede: `Reddit shows this ${community ? 'community' : 'post'} only to signed-in accounts. ${plural(total, 'item')} from Arctic Shift on the page.`,
+        busy: archive.loading,
+        stats: { posts: counts.posts, comments: counts.comments, oldest: archive.oldest },
+        actions: [reload],
+    };
+}
+
 async function refresh() {
     renderServices();
     if (connection?.missing?.length) {
@@ -235,6 +265,17 @@ async function refresh() {
     }
     if (!profile) {
         const onReddit = /^https:\/\/(?:www\.)?reddit\.com\//.test(tab?.url || '');
+        let archive = null;
+        if (onReddit) {
+            try {
+                archive = (await api.tabs.sendMessage(tab.id, { type: MESSAGE.profileStatus }))?.archive ?? null;
+            } catch { /* content script not running in this tab */ }
+        }
+        if (archive) {
+            render(describeArchive(archive));
+            schedule(archive.loading ? 900 : 2500);
+            return;
+        }
         render({
             key: onReddit ? 'idle-reddit' : 'idle',
             title: 'Open a profile that hides its history',
@@ -282,6 +323,15 @@ $('lookup').addEventListener('submit', async (event) => {
     window.close();
 });
 $('username').addEventListener('input', () => { $('lookup-hint').hidden = true; });
+
+readQuiet(api).then((on) => { $('quiet').checked = on; });
+$('quiet').addEventListener('change', async (event) => {
+    const on = event.currentTarget.checked;
+    await writeQuiet(on, api).catch(() => null);
+    // Turning it on applies at once; prompts already removed come back only
+    // after a reload.
+    $('quiet-hint').hidden = on;
+});
 
 $('forget').addEventListener('click', async () => {
     await api.runtime.sendMessage({ type: MESSAGE.clearSaved }).catch(() => null);

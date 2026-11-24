@@ -39,6 +39,8 @@ export function createInjector({
     now = Date.now,
     createObserver = null,
     autoRetryMs = AUTO_RETRY_MS,
+    // Quiet Reddit for a signed-out viewer: NSFW media is shown unveiled.
+    revealNsfw = () => false,
 } = {}) {
     if (!archive || !info || !detect) {
         // Wiring is missing: stay inert instead of half-injecting.
@@ -232,13 +234,29 @@ export function createInjector({
         state.onScroll = null;
     }
 
+    // An IntersectionObserver only reports changes. When a page of rows does
+    // not reach the bottom of the screen the sentinel never leaves view, so
+    // observing it again asks for its current state and loads the next page.
+    function rearm(state) {
+        if (!state.observer || !state.view) return;
+        state.observer.unobserve?.(state.view.sentinel);
+        state.observer.observe?.(state.view.sentinel);
+    }
+
     const pendingKinds = (state) => TAB_KINDS[state.tab].filter((kind) => !state.done[kind]);
+
+    function visibleRows(state) {
+        let count = 0;
+        for (const { element } of state.items.values()) if (!element.hidden) count += 1;
+        return count;
+    }
 
     async function loadMore(state) {
         if (current !== state || state.killed || state.loading || !state.view) return;
         if (!pendingKinds(state).length) return;
 
         state.loading = true;
+        state.visibleAtStart = visibleRows(state);
         state.phase = 'loading-archive';
         state.failure = null;
         state.failedKinds = new Set();
@@ -333,6 +351,9 @@ export function createInjector({
                 else view.partialError();
             } else if (!state.failure) state.error = null;
             if (done && !state.failure) unobserve(state);
+            // Only after a page that added rows the viewer can see: a Top
+            // filter that hides everything must not page through the archive.
+            else if (!done && !state.failure && visibleRows(state) > state.visibleAtStart) rearm(state);
             return;
         }
         // Nothing to show: hand the page back to Reddit's own panel and say why.
@@ -404,6 +425,7 @@ export function createInjector({
                 doc,
                 parent,
                 now: now(),
+                revealNsfw: Boolean(revealNsfw()),
             });
             if (!element) break;
             state.items.set(item.fullname, { item, element });

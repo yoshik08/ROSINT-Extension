@@ -238,7 +238,7 @@ export function commentAttributes(data, index = 0, parent = null) {
 
 // Build a visible row without requiring Reddit component registration. A native
 // HTML replacement may be substituted later, after checking its actual layout.
-export function createItem(kind, live, { index = 0, doc = document, parent = null, now } = {}) {
+export function createItem(kind, live, { index = 0, doc = document, parent = null, now, revealNsfw = false } = {}) {
     const element = doc.createElement('article');
     element.setAttribute('data-rosint-item', '');
     element.setAttribute('data-rosint-fullname', live.fullname);
@@ -254,7 +254,7 @@ export function createItem(kind, live, { index = 0, doc = document, parent = nul
         element.setAttribute(name, value);
     }
 
-    fillVisibleCard(element, kind, live, { doc, parent, now });
+    fillVisibleCard(element, kind, live, { doc, parent, now, revealNsfw });
     return element;
 }
 

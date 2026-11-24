@@ -7,6 +7,9 @@ import { backoffDelayMs, retryAfterMs } from '../../src/postLookup.js';
 import { INFO_BATCH } from './config.js';
 
 const MAX_INFO_RETRY_AFTER_MS = 60000;
+// Signed out, Reddit refuses every live lookup. After one refusal the next
+// pages skip the request instead of repeating it.
+const INFO_REFUSAL_MS = 5 * 60 * 1000;
 
 async function readJson(path, { fetchImpl = fetch, signal } = {}) {
     try {
@@ -79,6 +82,7 @@ export function createInfoClient({
 } = {}) {
     const sleep = wait || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     let tail = Promise.resolve();
+    let refusedUntil = 0;
 
     async function request(chunk, signal) {
         const url = `/api/info.json?id=${chunk.join(',')}&raw_json=1&sr_detail=true`;
@@ -101,6 +105,7 @@ export function createInfoClient({
                     return null;
                 }
             }
+            if (response && (response.status === 401 || response.status === 403)) refusedUntil = now() + INFO_REFUSAL_MS;
             if (response && response.status !== 429 && response.status < 500) return null;
             if (attempt >= retries) return null;
             const delay = retryAfterMs(response, now) ?? backoffDelayMs(attempt, random);
@@ -114,6 +119,7 @@ export function createInfoClient({
         // posts and comments can have the same base36 ID.
         const unique = [...new Set(ids.filter((id) => typeof id === 'string' && /^t[13]_[a-z0-9]+$/i.test(id)).map((id) => id.toLowerCase()))];
         const run = tail.then(async () => {
+            if (now() < refusedUntil) throw new Error('Reddit live lookup refused');
             const children = [];
             for (let i = 0; i < unique.length; i += batchSize) {
                 if (signal?.aborted) throw abortReason(signal);

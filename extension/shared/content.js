@@ -4,8 +4,10 @@
 // new one starts.
 
 import { MESSAGE } from './config.js';
+import { createFallback } from './fallback.js';
 import { createInjector } from './injector.js';
 import { findHiddenPanel, findNoticeBlock, parseProfilePath } from './nativeFeed.js';
+import { quietState } from './quiet.js';
 import { createInfoClient, detectHiddenHistory } from './reddit.js';
 
 const isPromiseApi = typeof globalThis.browser !== 'undefined' && typeof globalThis.browser?.runtime?.sendMessage === 'function';
@@ -54,7 +56,16 @@ export function boot({ doc = document, win = window } = {}) {
             }
             return result;
         },
+        // Quiet Reddit, signed out: restored NSFW media is shown like the
+        // rest of the page instead of behind a click.
+        revealNsfw: () => {
+            const quiet = quietState(doc);
+            return quiet.on && quiet.signedOut;
+        },
     });
+    // Signed out with Quiet Reddit on: NSFW communities and posts Reddit
+    // refuses to show come from the archive instead.
+    const fallback = createFallback({ doc, win, archive: (message) => send(message) });
 
     let scheduled = false;
     const hadRuntime = Boolean((globalThis.browser ?? globalThis.chrome)?.runtime?.id);
@@ -67,8 +78,10 @@ export function boot({ doc = document, win = window } = {}) {
         if (!profile) {
             injector.stop();
             lastKey = '';
+            fallback.sync();
             return;
         }
+        fallback.stop();
         const key = `${profile.username.toLowerCase()}:${profile.tab}`;
         const state = injector.status();
         const sameRun = state && state.key === key && state.feedConnected !== false;
@@ -121,11 +134,12 @@ export function boot({ doc = document, win = window } = {}) {
     function retry(message, sender, sendResponse) {
         if (sender.id !== runtime?.id) return false;
         if (message?.type === MESSAGE.profileStatus) {
-            sendResponse({ ok: true, state: injector.snapshot() });
+            sendResponse({ ok: true, state: injector.snapshot(), archive: fallback.status() });
             return false;
         }
         if (message?.type !== MESSAGE.retry) return false;
         injector.stop();
+        fallback.stop();
         lastKey = '';
         sync();
         sendResponse({ ok: true });
@@ -139,9 +153,10 @@ export function boot({ doc = document, win = window } = {}) {
         observer.disconnect();
         win.removeEventListener('popstate', schedule);
         injector.stop();
+        fallback.stop();
     }
 
-    return { injector, sync, stop: shutdown };
+    return { injector, fallback, sync, stop: shutdown };
 }
 
 if (typeof window !== 'undefined' && !globalThis.__rosintHiddenHistoryLoaded) {

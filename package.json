@@ -1,6 +1,6 @@
 {
   "name": "rosint-extension",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Browser extension that restores the posts and comments of Reddit profiles that hide their history, from public archives.",
   "license": "MIT",

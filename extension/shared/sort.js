@@ -62,7 +62,7 @@ export function orderItems(items, { mode = 'new', range = 'all', now = Date.now(
 // Top honours the dropdown's time filter (out-of-range rows are hidden rather
 // than dropped, so switching back to New restores them without a refetch);
 // new/hot ignore the filter exactly like Reddit does.
-export function createOrder({ mode = 'new', range = 'all', now = Date.now } = {}) {
+export function createOrder({ mode = 'new', range = 'all', now = Date.now() } = {}) {
     const cutoff = mode === 'top' && Number.isFinite(TOP_RANGES[range])
         ? now / 1000 - TOP_RANGES[range]
         : -Infinity;

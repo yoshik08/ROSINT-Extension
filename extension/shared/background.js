@@ -5,7 +5,7 @@
 import { createMessageHandler, defaultArchive } from './messageHandler.js';
 import { createArchiveCache } from './cache.js';
 import { connectionStatus, missingOrigins } from './connection.js';
-import { MESSAGE } from './config.js';
+import { ARCHIVE_MESSAGES, MESSAGE } from './config.js';
 
 const api = globalThis.browser ?? globalThis.chrome;
 const handle = createMessageHandler();
@@ -46,7 +46,7 @@ async function receive(message, sender) {
         await defaultArchive.clear();
         return { ok: true };
     }
-    if (message?.type === MESSAGE.archivePage) {
+    if (ARCHIVE_MESSAGES.has(message?.type)) {
         const missing = await missingOrigins(api);
         if (missing.length) {
             await api.action?.setBadgeText({ text: '!' });

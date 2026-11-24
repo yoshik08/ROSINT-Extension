@@ -1,9 +1,11 @@
 # Rosint Hidden History
 
-**See what a Reddit profile hides.** When an account hides its posts and
-comments, Rosint fills its profile back in with the history that public
-archives saved. The rows look like Reddit's own feed, follow light and dark
-mode, and sit right where the history would be.
+**See what Reddit hides.** When an account hides its posts and comments,
+Rosint fills its profile back in with the history that public archives saved.
+The rows look like Reddit's own feed, follow light and dark mode, and sit
+right where the history would be. And while you're signed out, Quiet Reddit
+stops Reddit from nagging you to sign in or hiding NSFW posts behind its age
+gate.
 
 <p align="center">
   <img src="store/screenshots/ready.png" width="300" alt="The Rosint popup after restoring a profile: 11 posts, 56 comments, earliest saved Nov 2025, with service status for the removal check, Arctic Shift and PullPush.">
@@ -19,6 +21,12 @@ mode, and sit right where the history would be.
   shown. If that can't be confirmed, nothing is shown.
 - **Fast on revisits.** Profiles you've opened before paint instantly from a
   copy kept in your browser, and stay readable when the archives are down.
+- **Quiet Reddit.** Signed out, Reddit stops asking: no Google sign-in
+  pop-up, no sign-up modal when you vote or after a while, no "open the app"
+  banners, no "log in to confirm your age" gate. NSFW posts show without the
+  blur, and adult communities that Reddit tells signed-out visitors "don't
+  exist" are filled in from the public archive. **Log In** still works, and
+  one switch in the popup turns it all off.
 - **Private.** No accounts, no analytics, no tracking. See [PRIVACY.md](PRIVACY.md).
 
 Works in Chrome, Edge, Brave and other Chromium browsers (111+), and Firefox
@@ -60,6 +68,15 @@ Prebuilt packages are attached to each
 4. Scrolling loads the next page. Reddit's New/Hot/Top menu re-orders the
    rows.
 
+Quiet Reddit runs on every Reddit page, before Reddit's own markup arrives.
+It only acts when the page shows you're signed out (Reddit's Log In button,
+its Google sign-in prompt or its age gate), and it never fetches anything to
+do it: it removes what Reddit draws on top, answers the over-18 guard the way
+you would, and closes sign-in prompts you didn't open yourself. When Reddit
+refuses an NSFW community or post outright, the extension asks Arctic Shift
+for that community's posts or that post's comments instead, with the same
+removal list applied to every row.
+
 The architecture, security model and test procedure are documented in
 [extension/README.md](extension/README.md) and
 [extension/RENDERING.md](extension/RENDERING.md).
@@ -68,7 +85,7 @@ The architecture, security model and test procedure are documented in
 
 | Permission | Why |
 | --- | --- |
-| `www.reddit.com` | Runs on profile pages and reads Reddit's own data for the profile you're viewing. |
+| `www.reddit.com` | Restores hidden profiles, reading Reddit's own data for the profile you're viewing, and keeps Reddit quiet while you're signed out. |
 | `arctic-shift.photon-reddit.com`, `api.pullpush.io` | The public archives the history comes from. |
 | `removal.rosint.dev` | Downloads the removal list so removed accounts are never shown. |
 | `storage` | Keeps a copy of profiles you've already opened, on this device only. |

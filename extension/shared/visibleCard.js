@@ -280,7 +280,7 @@ function veil(doc, media, label) {
     media.appendChild(cover);
 }
 
-function mediaFor(doc, data) {
+function mediaFor(doc, data, { revealNsfw = false } = {}) {
     const media = cardEl(doc, 'div', 'media');
     media.setAttribute('slot', 'post-media-container');
     const video = data.video || data.secure_media?.reddit_video || data.media?.reddit_video;
@@ -386,7 +386,8 @@ function mediaFor(doc, data) {
     } else {
         return null;
     }
-    if (data.over_18) veil(doc, media, 'View NSFW content');
+    // Quiet Reddit (signed out) shows NSFW media as is; spoilers stay veiled.
+    if (data.over_18 && !revealNsfw) veil(doc, media, 'View NSFW content');
     else if (data.spoiler) veil(doc, media, 'View spoiler');
     return media;
 }
@@ -477,7 +478,7 @@ function votes(doc, href, score) {
     return group;
 }
 
-function postCard(doc, card, data, { archived, now }) {
+function postCard(doc, card, data, { archived, now, revealNsfw = false }) {
     const href = permalinkOf(data);
     const community = String(data.subreddit || 'reddit');
     const title = decodeEntities(data.title || '');
@@ -518,7 +519,7 @@ function postCard(doc, card, data, { archived, now }) {
     if (tags.children.length) headText.appendChild(tags);
 
     const external = externalLink(data);
-    const media = mediaFor(doc, data);
+    const media = mediaFor(doc, data, { revealNsfw });
     if (external) {
         const domain = cardLink(doc, external.href, 'domain lift');
         domain.target = '_blank';
@@ -539,7 +540,7 @@ function postCard(doc, card, data, { archived, now }) {
         img.loading = 'lazy';
         img.addEventListener('error', () => thumb.remove());
         thumb.appendChild(img);
-        if (data.over_18) img.style.filter = 'blur(12px)';
+        if (data.over_18 && !revealNsfw) img.style.filter = 'blur(12px)';
         head.appendChild(thumb);
     }
 
@@ -615,7 +616,7 @@ export function setParentTitle(host, data, parent, doc = host.ownerDocument) {
     credit.append(cardEl(doc, 'span', 'sep', '•'), titleLink);
 }
 
-export function fillVisibleCard(host, kind, item, { doc, parent, now = Date.now() }) {
+export function fillVisibleCard(host, kind, item, { doc, parent, now = Date.now(), revealNsfw = false }) {
     const shadow = host.attachShadow({ mode: 'open' });
     const style = doc.createElement('style');
     style.textContent = CARD_CSS;
@@ -623,7 +624,7 @@ export function fillVisibleCard(host, kind, item, { doc, parent, now = Date.now(
     card.setAttribute('part', 'card');
     const archived = Boolean(item.archived);
     if (archived) host.setAttribute('data-rosint-archived', '');
-    if (kind === 'posts') postCard(doc, card, item.data, { archived, now });
+    if (kind === 'posts') postCard(doc, card, item.data, { archived, now, revealNsfw });
     else commentCard(doc, card, item.data, { archived, parent, now });
     const rule = cardEl(doc, 'hr', 'rule');
     shadow.append(style, card, rule);
